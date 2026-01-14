@@ -19,11 +19,17 @@ permissions:
 jobs:
   terraform:
     runs-on: ubuntu-latest
+
     strategy:
       matrix:
         stack:
           - states/dev/base
           - states/prod/base
+
+    # Job-level environment variables:
+    # - TF_VAR_* are automatically picked up by Terraform
+    env:
+      TF_VAR_alert_email: ${{ secrets.ALERT_EMAIL }}
 
     defaults:
       run:
@@ -31,10 +37,10 @@ jobs:
         working-directory: ${{ matrix.stack }}
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Terraform
+      - name: Setup Terraform CLI
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "1.6.6"
@@ -43,7 +49,7 @@ jobs:
       - name: Terraform Init
         run: terraform init -input=false
 
-      - name: Terraform Format
+      - name: Terraform Format Check
         run: terraform fmt -check -recursive
 
       - name: Terraform Validate
