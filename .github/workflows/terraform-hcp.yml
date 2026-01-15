@@ -1,64 +1,176 @@
-name: Terraform (CLI-driven, HCP backend)
+name: Terraform (HCP backend + AWS OIDC)
 
 on:
   pull_request:
-    paths:
-      - "modules/**"
-      - "states/**"
-      - ".github/workflows/**"
   push:
     branches: ["main"]
-    paths:
-      - "modules/**"
-      - "states/**"
-      - ".github/workflows/**"
+  workflow_dispatch:
 
+# Needed for GitHub OIDC -> AWS STS
 permissions:
   contents: read
+  id-token: write
+
+env:
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "false"
+  TF_CLI_ARGS: "-no-color"
+  AWS_REGION: "eu-central-1"
 
 jobs:
-  terraform:
+  fmt_validate:
+    name: fmt + validate
     runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        stack:
-          - states/dev/base
-          - states/prod/base
-
-    env:
-      TF_VAR_alert_email: ${{ secrets.ALERT_EMAIL }}
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      AWS_REGION: eu-central-1
-
-    defaults:
-      run:
-        shell: bash
-        working-directory: ${{ matrix.stack }}
-
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Terraform CLI
+      - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: "1.6.6"
-          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
 
-      - name: Terraform Init
-        run: terraform init -input=false
-
-      - name: Terraform Format Check
+      - name: Terraform fmt (repo)
         run: terraform fmt -check -recursive
 
-      - name: Terraform Validate
-        run: terraform validate
+      # Validate each stack directory that contains terraform code
+      - name: Validate dev bootstrap
+        working-directory: states/dev/bootstrap
+        run: |
+          terraform init -backend=false
+          terraform validate
 
-      - name: Terraform Plan
+      - name: Validate prod bootstrap
+        working-directory: states/prod/bootstrap
+        run: |
+          terraform init -backend=false
+          terraform validate
+
+  plan_dev:
+    name: plan (dev)
+    needs: [fmt_validate]
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC) - dev
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform (HCP token)
+        uses: hashicorp/setup-terraform@v3
+        with:
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+
+      - name: Terraform init (dev bootstrap)
+        working-directory: states/dev/bootstrap
+        run: terraform init
+
+      - name: Terraform plan (dev bootstrap)
+        working-directory: states/dev/bootstrap
+        env:
+          TF_VAR_repo_owner: "melosevich"
+          TF_VAR_repo_name: "aws-cloud-platform-iac-github-actions"
+          # Optional if your stack needs it:
+          TF_VAR_alert_email: ${{ secrets.ALERT_EMAIL }}
         run: terraform plan -input=false
 
-      - name: Terraform Apply
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+  plan_prod:
+    name: plan (prod)
+    needs: [fmt_validate]
+    runs-on: ubuntu-latest
+    environment: prod
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC) - prod
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform (HCP token)
+        uses: hashicorp/setup-terraform@v3
+        with:
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+
+      - name: Terraform init (prod bootstrap)
+        working-directory: states/prod/bootstrap
+        run: terraform init
+
+      - name: Terraform plan (prod bootstrap)
+        working-directory: states/prod/bootstrap
+        env:
+          TF_VAR_repo_owner: "melosevich"
+          TF_VAR_repo_name: "aws-cloud-platform-iac-github-actions"
+          TF_VAR_alert_email: ${{ secrets.ALERT_EMAIL }}
+        run: terraform plan -input=false
+
+  apply_dev:
+    name: apply (dev)
+    needs: [plan_dev]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC) - dev
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform (HCP token)
+        uses: hashicorp/setup-terraform@v3
+        with:
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+
+      - name: Terraform init (dev bootstrap)
+        working-directory: states/dev/bootstrap
+        run: terraform init
+
+      - name: Terraform apply (dev bootstrap)
+        working-directory: states/dev/bootstrap
+        env:
+          TF_VAR_repo_owner: "melosevich"
+          TF_VAR_repo_name: "aws-cloud-platform-iac-github-actions"
+          TF_VAR_alert_email: ${{ secrets.ALERT_EMAIL }}
+        run: terraform apply -auto-approve -input=false
+
+  apply_prod:
+    name: apply (prod)
+    needs: [plan_prod]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: prod
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC) - prod
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform (HCP token)
+        uses: hashicorp/setup-terraform@v3
+        with:
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+
+      - name: Terraform init (prod bootstrap)
+        working-directory: states/prod/bootstrap
+        run: terraform init
+
+      - name: Terraform apply (prod bootstrap)
+        working-directory: states/prod/bootstrap
+        env:
+          TF_VAR_repo_owner: "melosevich"
+          TF_VAR_repo_name: "aws-cloud-platform-iac-github-actions"
+          TF_VAR_alert_email: ${{ secrets.ALERT_EMAIL }}
         run: terraform apply -auto-approve -input=false
