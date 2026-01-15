@@ -53,6 +53,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Debug GitHub context
+        run: |
+          echo "event_name=${{ github.event_name }}"
+          echo "ref=${{ github.ref }}"
+
+      - name: Debug role ARN (masked)
+        run: |
+          echo "Role ARN is: ${{ secrets.AWS_ROLE_TO_ASSUME }}"
+
       - name: Configure AWS credentials (OIDC) - dev
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -85,6 +94,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Debug GitHub context
+        run: |
+          echo "event_name=${{ github.event_name }}"
+          echo "ref=${{ github.ref }}"
+
+      - name: Debug role ARN (masked)
+        run: |
+          echo "Role ARN is: ${{ secrets.AWS_ROLE_TO_ASSUME }}"
 
       - name: Configure AWS credentials (OIDC) - prod
         uses: aws-actions/configure-aws-credentials@v4
