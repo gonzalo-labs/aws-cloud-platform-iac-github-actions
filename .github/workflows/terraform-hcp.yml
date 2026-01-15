@@ -60,6 +60,16 @@ jobs:
         run: |
           echo "Role ARN is: ${{ secrets.AWS_ROLE_TO_ASSUME }}"
 
+      - name: Debug OIDC sub claim
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL="${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sts.amazonaws.com"
+          RESP="$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$URL")"
+          TOKEN="$(echo "$RESP" | jq -r '.value')"
+          PAYLOAD="$(echo "$TOKEN" | cut -d '.' -f2 | tr '_-' '/+' | awk '{l=length($0)%4; if(l==2) $0=$0"=="; else if(l==3) $0=$0"="; print $0}' | base64 -d)"
+          echo "$PAYLOAD" | jq -r '"aud=" + (.aud|tostring), "sub=" + .sub'
+
       - name: Configure AWS credentials (OIDC) - dev
         id: awscreds
         uses: aws-actions/configure-aws-credentials@v4
@@ -105,6 +115,16 @@ jobs:
       - name: Debug role ARN (masked)
         run: |
           echo "Role ARN is: ${{ secrets.AWS_ROLE_TO_ASSUME }}"
+
+      - name: Debug OIDC sub claim
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL="${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sts.amazonaws.com"
+          RESP="$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$URL")"
+          TOKEN="$(echo "$RESP" | jq -r '.value')"
+          PAYLOAD="$(echo "$TOKEN" | cut -d '.' -f2 | tr '_-' '/+' | awk '{l=length($0)%4; if(l==2) $0=$0"=="; else if(l==3) $0=$0"="; print $0}' | base64 -d)"
+          echo "$PAYLOAD" | jq -r '"aud=" + (.aud|tostring), "sub=" + .sub'          
 
       - name: Configure AWS credentials (OIDC) - prod
         id: awscreds
