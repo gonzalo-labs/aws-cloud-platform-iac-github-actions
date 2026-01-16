@@ -18,7 +18,7 @@ env:
 
 jobs:
   fmt_validate:
-    name: fmt + validate
+    name: fmt + validate (base only)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -30,20 +30,20 @@ jobs:
       - name: Terraform fmt (repo)
         run: terraform fmt -check -recursive
 
-      - name: Validate dev bootstrap
-        working-directory: states/dev/bootstrap
+      - name: Validate dev base
+        working-directory: states/dev/base
         run: |
           terraform init -backend=false
           terraform validate
 
-      - name: Validate prod bootstrap
-        working-directory: states/prod/bootstrap
+      - name: Validate prod base
+        working-directory: states/prod/base
         run: |
           terraform init -backend=false
           terraform validate
 
   plan_dev:
-    name: plan (dev)
+    name: plan (dev base)
     needs: [fmt_validate]
     runs-on: ubuntu-latest
     environment: dev
@@ -56,20 +56,6 @@ jobs:
           echo "event_name=${{ github.event_name }}"
           echo "ref=${{ github.ref }}"
 
-      - name: Debug role ARN (masked)
-        run: |
-          echo "Role ARN is: ${{ secrets.AWS_ROLE_TO_ASSUME }}"
-
-      - name: Debug OIDC sub claim
-        shell: bash
-        run: |
-          set -euo pipefail
-          URL="${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sts.amazonaws.com"
-          RESP="$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$URL")"
-          TOKEN="$(echo "$RESP" | jq -r '.value')"
-          PAYLOAD="$(echo "$TOKEN" | cut -d '.' -f2 | tr '_-' '/+' | awk '{l=length($0)%4; if(l==2) $0=$0"=="; else if(l==3) $0=$0"="; print $0}' | base64 -d)"
-          echo "$PAYLOAD" | jq -r '"aud=" + (.aud|tostring), "sub=" + .sub'
-
       - name: Configure AWS credentials (OIDC) - dev
         id: awscreds
         uses: aws-actions/configure-aws-credentials@v4
@@ -77,8 +63,7 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Verify AWS identity (only if assume succeeded)
-        if: steps.awscreds.outcome == 'success'
+      - name: Verify AWS identity
         run: aws sts get-caller-identity
 
       - name: Setup Terraform (HCP token)
@@ -86,20 +71,18 @@ jobs:
         with:
           cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
 
-      - name: Terraform init (dev bootstrap)
-        working-directory: states/dev/bootstrap
+      - name: Terraform init (dev base)
+        working-directory: states/dev/base
         run: terraform init
 
-      - name: Terraform plan (dev bootstrap)
-        working-directory: states/dev/bootstrap
+      - name: Terraform plan (dev base)
+        working-directory: states/dev/base
         env:
-          TF_VAR_repo_owner: "melosevich"
-          TF_VAR_repo_name: "aws-cloud-platform-iac-github-actions"
           TF_VAR_alert_email: ${{ secrets.ALERT_EMAIL }}
         run: terraform plan -input=false
 
   plan_prod:
-    name: plan (prod)
+    name: plan (prod base)
     needs: [fmt_validate]
     runs-on: ubuntu-latest
     environment: prod
@@ -112,20 +95,6 @@ jobs:
           echo "event_name=${{ github.event_name }}"
           echo "ref=${{ github.ref }}"
 
-      - name: Debug role ARN (masked)
-        run: |
-          echo "Role ARN is: ${{ secrets.AWS_ROLE_TO_ASSUME }}"
-
-      - name: Debug OIDC sub claim
-        shell: bash
-        run: |
-          set -euo pipefail
-          URL="${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=sts.amazonaws.com"
-          RESP="$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$URL")"
-          TOKEN="$(echo "$RESP" | jq -r '.value')"
-          PAYLOAD="$(echo "$TOKEN" | cut -d '.' -f2 | tr '_-' '/+' | awk '{l=length($0)%4; if(l==2) $0=$0"=="; else if(l==3) $0=$0"="; print $0}' | base64 -d)"
-          echo "$PAYLOAD" | jq -r '"aud=" + (.aud|tostring), "sub=" + .sub'          
-
       - name: Configure AWS credentials (OIDC) - prod
         id: awscreds
         uses: aws-actions/configure-aws-credentials@v4
@@ -133,8 +102,7 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Verify AWS identity (only if assume succeeded)
-        if: steps.awscreds.outcome == 'success'
+      - name: Verify AWS identity
         run: aws sts get-caller-identity
 
       - name: Setup Terraform (HCP token)
@@ -142,20 +110,18 @@ jobs:
         with:
           cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
 
-      - name: Terraform init (prod bootstrap)
-        working-directory: states/prod/bootstrap
+      - name: Terraform init (prod base)
+        working-directory: states/prod/base
         run: terraform init
 
-      - name: Terraform plan (prod bootstrap)
-        working-directory: states/prod/bootstrap
+      - name: Terraform plan (prod base)
+        working-directory: states/prod/base
         env:
-          TF_VAR_repo_owner: "melosevich"
-          TF_VAR_repo_name: "aws-cloud-platform-iac-github-actions"
           TF_VAR_alert_email: ${{ secrets.ALERT_EMAIL }}
         run: terraform plan -input=false
 
   apply_dev:
-    name: apply (dev)
+    name: apply (dev base)
     needs: [plan_dev]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
@@ -164,10 +130,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Debug role ARN (masked)
-        run: |
-          echo "Role ARN is: ${{ secrets.AWS_ROLE_TO_ASSUME }}"
-
       - name: Configure AWS credentials (OIDC) - dev
         id: awscreds
         uses: aws-actions/configure-aws-credentials@v4
@@ -175,8 +137,7 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Verify AWS identity (only if assume succeeded)
-        if: steps.awscreds.outcome == 'success'
+      - name: Verify AWS identity
         run: aws sts get-caller-identity
 
       - name: Setup Terraform (HCP token)
@@ -184,20 +145,18 @@ jobs:
         with:
           cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
 
-      - name: Terraform init (dev bootstrap)
-        working-directory: states/dev/bootstrap
+      - name: Terraform init (dev base)
+        working-directory: states/dev/base
         run: terraform init
 
-      - name: Terraform apply (dev bootstrap)
-        working-directory: states/dev/bootstrap
+      - name: Terraform apply (dev base)
+        working-directory: states/dev/base
         env:
-          TF_VAR_repo_owner: "melosevich"
-          TF_VAR_repo_name: "aws-cloud-platform-iac-github-actions"
           TF_VAR_alert_email: ${{ secrets.ALERT_EMAIL }}
         run: terraform apply -auto-approve -input=false
 
   apply_prod:
-    name: apply (prod)
+    name: apply (prod base)
     needs: [plan_prod]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
@@ -206,10 +165,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Debug role ARN (masked)
-        run: |
-          echo "Role ARN is: ${{ secrets.AWS_ROLE_TO_ASSUME }}"
-
       - name: Configure AWS credentials (OIDC) - prod
         id: awscreds
         uses: aws-actions/configure-aws-credentials@v4
@@ -217,8 +172,7 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Verify AWS identity (only if assume succeeded)
-        if: steps.awscreds.outcome == 'success'
+      - name: Verify AWS identity
         run: aws sts get-caller-identity
 
       - name: Setup Terraform (HCP token)
@@ -226,14 +180,12 @@ jobs:
         with:
           cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
 
-      - name: Terraform init (prod bootstrap)
-        working-directory: states/prod/bootstrap
+      - name: Terraform init (prod base)
+        working-directory: states/prod/base
         run: terraform init
 
-      - name: Terraform apply (prod bootstrap)
-        working-directory: states/prod/bootstrap
+      - name: Terraform apply (prod base)
+        working-directory: states/prod/base
         env:
-          TF_VAR_repo_owner: "melosevich"
-          TF_VAR_repo_name: "aws-cloud-platform-iac-github-actions"
           TF_VAR_alert_email: ${{ secrets.ALERT_EMAIL }}
         run: terraform apply -auto-approve -input=false
