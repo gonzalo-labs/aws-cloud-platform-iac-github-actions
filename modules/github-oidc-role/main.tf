@@ -166,6 +166,33 @@ data "aws_iam_policy_document" "inline" {
     actions   = ["sts:GetCallerIdentity"]
     resources = ["*"]
   }
+
+  statement {
+    sid    = "LambdaDeployment"
+    effect = "Allow"
+    actions = [
+      "lambda:CreateFunction",
+      "lambda:UpdateFunctionCode",
+      "lambda:UpdateFunctionConfiguration",
+      "lambda:GetFunction",
+      "lambda:GetFunctionConfiguration",
+      "lambda:DeleteFunction",
+      "lambda:ListFunctions"
+    ]
+    resources = ["*"]
+  }
+
+  statement {
+    sid       = "IamPassRole"
+    effect    = "Allow"
+    actions   = ["iam:PassRole"]
+    resources = ["*"]
+    condition {
+      test     = "StringEquals"
+      variable = "iam:PassedToService"
+      values   = ["lambda.amazonaws.com"]
+    }
+  }
 }
 
 resource "aws_iam_role_policy" "inline" {

@@ -6,7 +6,7 @@
 variable "role_name" {
   type        = string
   description = "IAM role name for GitHub Actions OIDC federation"
-  default     = "GitHubActionsFinOpsRole"
+  default     = "GitHubActionsRole"
 }
 
 # Optional description for the role
