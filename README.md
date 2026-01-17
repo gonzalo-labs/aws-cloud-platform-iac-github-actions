@@ -18,22 +18,20 @@ The design mirrors how real platform teams operate: **identity and trust are est
 
 ```mermaid
 flowchart LR
-    subgraph Bootstrap["Bootstrap (manual, SSO-only)"]
-        Admin[Platform Admin]
-        Admin -->|AWS SSO| IAM[AWS IAM<br/>OIDC Provider + Roles]
-    end
+  subgraph Bootstrap[Bootstrap]
+    Admin[Admin]
+    Admin -->|SSO| IAM[OIDC provider + roles]
+  end
 
-    subgraph Runtime["Runtime (CI-managed)"]
-        Dev[Developer]
-        Dev -->|Push / PR| GH[GitHub Actions]
+  subgraph Runtime[Runtime]
+    Dev[Dev]
+    Dev -->|push/PR| GH[GitHub Actions]
+    GH -->|OIDC| STS[STS assume role]
+    STS --> AWS[Budgets API]
+    GH --> HCP[Remote state]
+  end
 
-        GH -->|OIDC| STS[AWS STS]
-        STS --> AWS[AWS APIs<br/>(Budgets)]
-
-        GH --> HCP[HCP Terraform<br/>(State + Locking)]
-    end
-
-    IAM --> STS
+  IAM --> STS
 ```
 
 **What this shows**
