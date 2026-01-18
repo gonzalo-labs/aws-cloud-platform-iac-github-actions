@@ -204,6 +204,7 @@ data "aws_iam_policy_document" "inline" {
       "s3:GetBucketVersioning",
       "s3:PutBucketVersioning",
       "s3:GetBucketAcl",
+      "s3:GetBucketCORS",
       "s3:GetEncryptionConfiguration",
       "s3:PutEncryptionConfiguration",
       "s3:GetBucketPublicAccessBlock",
