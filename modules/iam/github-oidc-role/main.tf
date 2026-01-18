@@ -186,6 +186,7 @@ data "aws_iam_policy_document" "inline" {
       "lambda:GetFunctionConfiguration",
       "lambda:DeleteFunction",
       "lambda:ListFunctions",
+      "lambda:ListVersionsByFunction",
       "lambda:RemovePermission"
     ]
     resources = ["*"]

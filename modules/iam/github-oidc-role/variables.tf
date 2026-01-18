@@ -28,3 +28,10 @@ variable "github_subjects" {
   type        = list(string)
   description = "Allowed GitHub OIDC subject claims (sub)"
 }
+
+# Optional list of IAM role ARNs that GitHub Actions may pass to Lambda.
+variable "passrole_arns" {
+  type        = list(string)
+  description = "IAM role ARNs allowed for iam:PassRole to Lambda."
+  default     = []
+}
