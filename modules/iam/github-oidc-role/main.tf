@@ -201,8 +201,8 @@ data "aws_iam_policy_document" "inline" {
       "s3:GetBucketLocation",
       "s3:GetBucketVersioning",
       "s3:PutBucketVersioning",
-      "s3:GetBucketEncryption",
-      "s3:PutBucketEncryption",
+      "s3:GetEncryptionConfiguration",
+      "s3:PutEncryptionConfiguration",
       "s3:GetBucketPublicAccessBlock",
       "s3:PutBucketPublicAccessBlock",
       "s3:GetBucketPolicy",
@@ -210,10 +210,10 @@ data "aws_iam_policy_document" "inline" {
       "s3:DeleteBucketPolicy",
       "s3:GetBucketTagging",
       "s3:PutBucketTagging",
-      "s3:DeleteBucketTagging",
+      "s3:GetBucketTagging",
       "s3:PutLifecycleConfiguration",
       "s3:GetLifecycleConfiguration",
-      "s3:DeleteLifecycleConfiguration",
+      "s3:GetLifecycleConfiguration",
       "s3:PutObject",
       "s3:GetObject",
       "s3:DeleteObject",
@@ -244,15 +244,18 @@ data "aws_iam_policy_document" "inline" {
     resources = ["*"]
   }
 
-  statement {
-    sid       = "IamPassRole"
-    effect    = "Allow"
-    actions   = ["iam:PassRole"]
-    resources = ["*"]
-    condition {
-      test     = "StringEquals"
-      variable = "iam:PassedToService"
-      values   = ["lambda.amazonaws.com"]
+  dynamic "statement" {
+    for_each = length(var.passrole_arns) > 0 ? [1] : []
+    content {
+      sid       = "IamPassRole"
+      effect    = "Allow"
+      actions   = ["iam:PassRole"]
+      resources = var.passrole_arns
+      condition {
+        test     = "StringEquals"
+        variable = "iam:PassedToService"
+        values   = ["lambda.amazonaws.com"]
+      }
     }
   }
 }
