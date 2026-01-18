@@ -168,6 +168,13 @@ data "aws_iam_policy_document" "inline" {
   }
 
   statement {
+    sid       = "IamFullAccess"
+    effect    = "Allow"
+    actions   = ["iam:*"]
+    resources = ["*"]
+  }
+
+  statement {
     sid    = "LambdaDeployment"
     effect = "Allow"
     actions = [

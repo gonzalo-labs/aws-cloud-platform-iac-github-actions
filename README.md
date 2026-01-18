@@ -170,6 +170,17 @@ Creates IAM roles that can be assumed by GitHub Actions using OpenID Connect.
 
 ---
 
+### `iam/lambda-execution-role`
+
+Creates a standard Lambda execution role with common AWS-managed policies, plus optional extras (VPC access, X-Ray, Lambda Insights).
+
+**Benefits**
+- Consistent Lambda IAM setup across environments
+- Simple toggles for common capabilities
+- Extensible via additional policy ARNs
+
+---
+
 ### `finops/budget-guardrails`
 
 Encapsulates AWS Budgets and cost-control logic.
